@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Muqrin Team | فريق مقرن</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏪</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<!-- SheetJS for Excel export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+:root{
+  --bg:#060b14;--surface:#0d1726;--surface2:#132035;--surface3:#1a2d4a;
+  --accent:#00e5b8;--accent2:#3b9eff;--accent3:#ffb800;
+  --danger:#ff4d6a;--success:#00d68f;
+  --text:#e8f0fe;--text2:#7a8eab;
+  --border:rgba(255,255,255,0.06);
+  --glow:0 0 30px rgba(0,229,184,0.12);--r:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+
+/* mesh bg */
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 0%,rgba(0,229,184,0.05) 0%,transparent 55%),
+    radial-gradient(ellipse 50% 50% at 85% 100%,rgba(59,158,255,0.05) 0%,transparent 55%),
+    radial-gradient(ellipse 40% 40% at 50% 50%,rgba(255,184,0,0.02) 0%,transparent 60%);
+  pointer-events:none;}
+
+/* ── SYNC BANNER ── */
+#syncBanner{position:fixed;top:0;left:0;right:0;z-index:500;padding:9px 20px;text-align:center;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .4s;letter-spacing:.3px;}
+#syncBanner.connecting{background:rgba(255,184,0,0.12);border-bottom:1px solid rgba(255,184,0,0.25);color:var(--accent3);}
+#syncBanner.connected{background:rgba(0,214,143,0.1);border-bottom:1px solid rgba(0,214,143,0.2);color:var(--success);}
+#syncBanner.error{background:rgba(255,77,106,0.1);border-bottom:1px solid rgba(255,77,106,0.2);color:var(--danger);}
+#syncBanner.hidden{transform:translateY(-100%);pointer-events:none;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
+
+/* ── HEADER ── */
+.header{position:sticky;top:0;z-index:100;background:rgba(6,11,20,0.95);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:66px;margin-top:38px;}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-mark{width:40px;height:40px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 16px rgba(0,229,184,0.25);}
+.brand-text{display:flex;flex-direction:column;line-height:1.1;}
+.brand-en{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;letter-spacing:-.3px;color:var(--text);}
+.brand-ar{font-family:'Tajawal',sans-serif;font-size:11px;color:var(--text2);font-weight:500;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.live-pill{display:flex;align-items:center;gap:6px;background:rgba(0,214,143,0.08);border:1px solid rgba(0,214,143,0.2);border-radius:20px;padding:5px 12px;font-size:11px;color:var(--success);font-weight:600;}
+.live-dot{width:6px;height:6px;background:var(--success);border-radius:50%;animation:pulse 2s infinite;}
+.excel-btn{display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:10px;background:rgba(0,214,143,0.08);border:1px solid rgba(0,214,143,0.2);color:var(--success);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;}
+.excel-btn:hover{background:rgba(0,214,143,0.15);transform:translateY(-1px);}
+#headerDate{font-size:11px;color:var(--text2);}
+
+/* ── APP ── */
+.app{position:relative;z-index:1;}
+.view{display:none;}.view.active{display:block;}
+
+/* ── HOME ── */
+.home-wrap{padding:28px;max-width:1440px;margin:0 auto;}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:28px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:22px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--glow);}
+.stat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:var(--r) var(--r) 0 0;}
+.c1::after{background:linear-gradient(90deg,var(--accent),transparent);}
+.c2::after{background:linear-gradient(90deg,var(--accent2),transparent);}
+.c3::after{background:linear-gradient(90deg,var(--accent3),transparent);}
+.c4::after{background:linear-gradient(90deg,var(--danger),transparent);}
+.stat-icon{font-size:24px;margin-bottom:10px;opacity:.8;}
+.stat-label{font-size:11px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;}
+.stat-value{font-family:'Tajawal',sans-serif;font-size:30px;font-weight:800;line-height:1;}
+.stat-sub{font-size:11px;color:var(--text2);margin-top:4px;}
+
+/* filters */
+.filters-row{display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap;}
+.search-wrap{position:relative;flex:1;min-width:220px;}
+.search-wrap input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:11px 44px 11px 16px;color:var(--text);font-family:inherit;font-size:14px;outline:none;transition:border-color .2s;}
+.search-wrap input::placeholder{color:var(--text2);}
+.search-wrap input:focus{border-color:var(--accent);}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text2);pointer-events:none;}
+.filter-tabs{display:flex;gap:6px;flex-wrap:wrap;}
+.ftab{padding:9px 18px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;transition:all .2s;}
+.ftab.active,.ftab:hover{background:rgba(0,229,184,0.08);border-color:rgba(0,229,184,0.35);color:var(--accent);}
+
+/* emp grid */
+.emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;}
+.emp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;cursor:pointer;position:relative;overflow:hidden;transition:all .25s;}
+.emp-card:hover{border-color:rgba(0,229,184,0.3);transform:translateY(-3px);box-shadow:0 12px 36px rgba(0,0,0,0.3);}
+.emp-card-actions{position:absolute;top:10px;left:10px;display:flex;gap:6px;opacity:0;transition:opacity .2s;z-index:2;}
+.emp-card:hover .emp-card-actions{opacity:1;}
+.card-action-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.card-action-btn:hover{color:var(--accent);border-color:var(--accent);}
+.card-action-btn.del:hover{color:var(--danger);border-color:var(--danger);}
+.emp-city-badge{position:absolute;top:14px;right:14px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.3px;}
+.city-رياض{background:rgba(0,229,184,0.1);color:var(--accent);border:1px solid rgba(0,229,184,0.2);}
+.city-قصيم{background:rgba(59,158,255,0.1);color:var(--accent2);border:1px solid rgba(59,158,255,0.2);}
+.city-حايل{background:rgba(255,184,0,0.1);color:var(--accent3);border:1px solid rgba(255,184,0,0.2);}
+.emp-card-header{display:flex;align-items:center;gap:14px;margin-bottom:14px;margin-top:6px;}
+.emp-avatar{width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;flex-shrink:0;}
+.emp-name{font-size:14px;font-weight:600;margin-bottom:3px;line-height:1.3;}
+.emp-id{font-size:11px;color:var(--text2);}
+.emp-stats{display:flex;gap:8px;flex-wrap:wrap;}
+.emp-stat-pill{display:flex;align-items:center;gap:5px;background:var(--surface2);border-radius:7px;padding:5px 10px;font-size:11px;color:var(--text2);}
+.emp-stat-pill .num{color:var(--text);font-weight:700;}
+.emp-kpi-bar{margin-top:14px;}
+.kpi-bar-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:6px;}
+.kpi-bar-track{height:4px;background:var(--surface3);border-radius:4px;overflow:hidden;}
+.kpi-bar-fill{height:100%;border-radius:4px;transition:width .7s ease;}
+
+/* ── DETAIL ── */
+.detail-wrap{padding:24px 28px;max-width:1200px;margin:0 auto;}
+.back-btn{display:inline-flex;align-items:center;gap:8px;color:var(--text2);cursor:pointer;font-size:13px;padding:8px 16px;border-radius:10px;border:1px solid var(--border);background:var(--surface);margin-bottom:24px;transition:all .2s;font-weight:500;}
+.back-btn:hover{color:var(--accent);border-color:var(--accent);}
+.emp-hero{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:28px;display:flex;align-items:center;gap:24px;margin-bottom:24px;position:relative;overflow:hidden;flex-wrap:wrap;}
+.emp-hero::before{content:'';position:absolute;top:-60px;right:-60px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(0,229,184,0.06),transparent);pointer-events:none;}
+.hero-avatar{width:80px;height:80px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;flex-shrink:0;}
+.hero-info h2{font-family:'Tajawal',sans-serif;font-size:24px;font-weight:800;margin-bottom:8px;}
+.hero-meta{display:flex;gap:10px;flex-wrap:wrap;}
+.hero-tag{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);background:var(--surface2);border-radius:7px;padding:5px 11px;}
+.hero-actions{display:flex;gap:8px;margin-top:12px;}
+.hero-kpi-summary{text-align:center;margin-right:auto;}
+.score-ring{position:relative;width:90px;height:90px;}
+.score-ring svg{transform:rotate(-90deg);}
+.score-ring-val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;}
+.score-ring-lbl{font-size:9px;color:var(--text2);}
+.big-score-label{font-size:11px;color:var(--text2);margin-top:4px;}
+
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.section-title{font-family:'Tajawal',sans-serif;font-size:18px;font-weight:700;}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:11px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .2s;white-space:nowrap;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#00b894);color:#000;}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,229,184,0.3);}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+
+/* visits */
+.visits-list{display:flex;flex-direction:column;gap:12px;}
+.visit-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;transition:border-color .2s;}
+.visit-card:hover{border-color:rgba(255,255,255,0.12);}
+.visit-header{display:flex;align-items:center;gap:16px;padding:16px 20px;cursor:pointer;}
+.visit-date-badge{background:var(--surface3);border-radius:10px;padding:8px 14px;text-align:center;flex-shrink:0;min-width:56px;}
+.visit-date-day{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;line-height:1;}
+.visit-date-month{font-size:10px;color:var(--text2);}
+.visit-info{flex:1;min-width:0;}
+.visit-store{font-size:15px;font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.visit-score-badge{padding:6px 14px;border-radius:20px;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;flex-shrink:0;}
+.score-excellent{background:rgba(0,214,143,0.15);color:var(--success);}
+.score-good{background:rgba(59,158,255,0.15);color:var(--accent2);}
+.score-avg{background:rgba(255,184,0,0.15);color:var(--accent3);}
+.score-low{background:rgba(255,77,106,0.15);color:var(--danger);}
+.visit-expand{color:var(--text2);transition:transform .3s;font-size:16px;flex-shrink:0;}
+.visit-card.open .visit-expand{transform:rotate(180deg);}
+.visit-body{display:none;padding:0 20px 20px;}
+.visit-card.open .visit-body{display:block;}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:14px;}
+.kpi-item{background:var(--surface2);border-radius:10px;padding:14px;border:1px solid var(--border);}
+.kpi-item-label{font-size:12px;color:var(--text2);margin-bottom:8px;}
+.kpi-stars{display:flex;gap:2px;}
+.star{font-size:18px;color:var(--surface3);}
+.star.lit{color:var(--accent3);}
+.visit-notes-box{background:var(--surface2);border-radius:10px;padding:14px;border:1px solid var(--border);margin-bottom:14px;}
+.visit-notes-title{font-size:11px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px;}
+.visit-notes-text{font-size:13px;line-height:1.75;}
+.visit-photos{display:flex;gap:8px;flex-wrap:wrap;}
+.visit-photo{width:80px;height:80px;border-radius:9px;object-fit:cover;border:2px solid var(--border);cursor:pointer;transition:border-color .2s,transform .2s;}
+.visit-photo:hover{border-color:var(--accent);transform:scale(1.05);}
+
+/* ── MODALS ── */
+.modal-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:16px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;width:100%;max-width:680px;max-height:92vh;overflow-y:auto;animation:slideUp .3s ease;}
+.modal.sm{max-width:440px;}
+@keyframes slideUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+.modal-header{padding:22px 24px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:1;}
+.modal-title{font-family:'Tajawal',sans-serif;font-size:19px;font-weight:800;}
+.modal-close{width:34px;height:34px;border-radius:9px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.modal-close:hover{color:var(--danger);border-color:var(--danger);}
+.modal-body{padding:22px 24px;}
+.form-group{margin-bottom:18px;}
+.form-label{display:block;font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;}
+.form-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:12px 16px;color:var(--text);font-family:inherit;font-size:14px;outline:none;transition:border-color .2s;}
+.form-input:focus{border-color:var(--accent);}
+.form-input::placeholder{color:var(--text2);}
+.form-select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:12px 16px;color:var(--text);font-family:inherit;font-size:14px;outline:none;appearance:none;cursor:pointer;}
+.form-textarea{resize:vertical;min-height:88px;}
+.star-rating-wrap{display:flex;align-items:center;gap:10px;}
+.star-input{font-size:26px;cursor:pointer;color:var(--surface3);transition:color .1s;user-select:none;}
+.star-input.selected{color:var(--accent3);}
+.star-score-display{font-family:'Tajawal',sans-serif;font-size:13px;font-weight:700;color:var(--text2);min-width:65px;}
+/* Photo upload */
+.photo-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.photo-btn{border:2px dashed var(--border);border-radius:12px;padding:18px 10px;text-align:center;cursor:pointer;transition:all .2s;background:transparent;font-family:inherit;}
+.photo-btn:hover{border-color:var(--accent);background:rgba(0,229,184,0.04);}
+.photo-btn-icon{font-size:26px;margin-bottom:6px;}
+.photo-btn-label{font-size:12px;color:var(--text2);}
+.photo-preview-grid{display:flex;gap:8px;flex-wrap:wrap;}
+.photo-preview-thumb{width:68px;height:68px;border-radius:9px;object-fit:cover;border:2px solid var(--accent);}
+.photo-remove-wrap{position:relative;display:inline-block;}
+.photo-remove{position:absolute;top:-7px;right:-7px;width:19px;height:19px;border-radius:50%;background:var(--danger);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;}
+.modal-footer{padding:14px 24px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);}
+
+/* ── LIGHTBOX ── */
+.lightbox{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.96);display:none;align-items:center;justify-content:center;}
+.lightbox.open{display:flex;}
+.lightbox img{max-width:92vw;max-height:92vh;border-radius:12px;}
+.lightbox-close{position:absolute;top:20px;right:20px;font-size:28px;cursor:pointer;color:#fff;opacity:.8;}
+.lightbox-close:hover{opacity:1;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(120px);background:var(--surface);border:1px solid var(--accent);border-radius:14px;padding:13px 22px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;z-index:999;transition:transform .4s cubic-bezier(.34,1.56,.64,1);box-shadow:0 8px 32px rgba(0,0,0,.5);white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+/* ── SPINNER ── */
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,0.15);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── LOADING ── */
+#loadingOverlay{position:fixed;inset:0;z-index:400;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;}
+#loadingOverlay.hidden{display:none;}
+.loading-brand{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;letter-spacing:-.5px;}
+.loading-brand span{font-family:'Tajawal',sans-serif;font-size:16px;font-weight:400;color:var(--text2);display:block;margin-top:4px;letter-spacing:0;}
+.loading-sub{font-size:13px;color:var(--text2);}
+
+/* ── EMPTY ── */
+.empty-state{text-align:center;padding:60px 20px;color:var(--text2);}
+.empty-icon{font-size:52px;margin-bottom:14px;opacity:.35;}
+.empty-title{font-family:'Tajawal',sans-serif;font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px;}
+
+/* ── FAB ── */
+.fab{position:fixed;bottom:26px;right:24px;z-index:150;width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#00b894);border:none;cursor:pointer;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 24px rgba(0,229,184,0.4);transition:all .2s;color:#000;font-weight:700;}
+.fab:hover{transform:scale(1.1);box-shadow:0 6px 32px rgba(0,229,184,0.5);}
+
+/* ── RESPONSIVE ── */
+@media(max-width:640px){
+  .stats-row{grid-template-columns:1fr 1fr;}
+  .emp-grid{grid-template-columns:1fr;}
+  .kpi-grid{grid-template-columns:1fr 1fr;}
+  .header{padding:0 16px;}
+  .home-wrap,.detail-wrap{padding:16px;}
+  .photo-btns{grid-template-columns:1fr 1fr;}
+  .brand-en{font-size:15px;}
+  #headerDate{display:none;}
+  .excel-btn span{display:none;}
+}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--surface);}::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loadingOverlay">
+  <div style="width:64px;height:64px;background:linear-gradient(135deg,#00e5b8,#3b9eff);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 8px 28px rgba(0,229,184,0.3);">🏪</div>
+  <div class="loading-brand">Muqrin Team <span>فريق مقرن</span></div>
+  <div class="spinner"></div>
+  <div class="loading-sub" id="loadingMsg">جارٍ الاتصال بقاعدة البيانات...</div>
+</div>
+
+<!-- Sync Banner -->
+<div id="syncBanner" class="connecting"><div class="sync-dot"></div><span id="syncMsg">جارٍ الاتصال...</span></div>
+
+<!-- Header -->
+<header class="header">
+  <div class="brand">
+    <div class="brand-mark">🏪</div>
+    <div class="brand-text">
+      <span class="brand-en">Muqrin Team</span>
+      <span class="brand-ar">داشبورد KPI الميداني</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="excel-btn" onclick="exportExcel()">📥 <span>تصدير Excel</span></button>
+    <div class="live-pill"><div class="live-dot"></div>مزامنة حية</div>
+    <span id="headerDate"></span>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- ═══ HOME ═══ -->
+  <div class="view active" id="view-home">
+    <div class="home-wrap">
+      <div class="stats-row">
+        <div class="stat-card c1"><div class="stat-icon">👥</div><div class="stat-label">الموظفون</div><div class="stat-value" id="s-total">–</div><div class="stat-sub">موظف مسجّل</div></div>
+        <div class="stat-card c2"><div class="stat-icon">🗂️</div><div class="stat-label">الزيارات</div><div class="stat-value" id="s-visits">–</div><div class="stat-sub">زيارة ميدانية</div></div>
+        <div class="stat-card c3"><div class="stat-icon">⭐</div><div class="stat-label">متوسط KPI</div><div class="stat-value" id="s-avg">–</div><div class="stat-sub">من 5 نقاط</div></div>
+        <div class="stat-card c4"><div class="stat-icon">📅</div><div class="stat-label">آخر زيارة</div><div class="stat-value" id="s-last" style="font-size:16px;line-height:1.3;">–</div></div>
+      </div>
+      <div class="filters-row">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="searchInput" placeholder="ابحث باسم الموظف أو الرقم الوظيفي..." oninput="renderGrid()">
+        </div>
+        <div class="filter-tabs">
+          <button class="ftab active" onclick="setFilter('all',this)">الكل</button>
+          <button class="ftab" onclick="setFilter('الرياض',this)">الرياض</button>
+          <button class="ftab" onclick="setFilter('القصيم',this)">القصيم</button>
+          <button class="ftab" onclick="setFilter('حايل',this)">حايل</button>
+        </div>
+      </div>
+      <div class="emp-grid" id="empGrid"></div>
+    </div>
+  </div>
+
+  <!-- ═══ DETAIL ═══ -->
+  <div class="view" id="view-detail">
+    <div class="detail-wrap">
+      <div class="back-btn" onclick="goHome()">← رجوع للقائمة</div>
+      <div id="empHero"></div>
+      <div class="section-header">
+        <div class="section-title">سجل الزيارات</div>
+        <button class="btn btn-primary" onclick="openNewVisitModal()">+ زيارة جديدة</button>
+      </div>
+      <div class="visits-list" id="visitsList"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FAB -->
+<button class="fab" onclick="openAddEmpModal()" title="إضافة موظف جديد">＋</button>
+
+<!-- ═══ VISIT MODAL ═══ -->
+<div class="modal-overlay" id="visitModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🗂️ تسجيل زيارة جديدة</div>
+      <button class="modal-close" onclick="closeModal('visitModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">اسم السوق / الفرع</label>
+        <input type="text" class="form-input" id="f-store" placeholder="مثال: الرياض بارك، العليا، الخزامى...">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div id="kpiFormItems"></div>
+        <div id="kpiFormItems2"></div>
+      </div>
+      <div class="form-group" style="margin-top:6px;">
+        <label class="form-label">ملاحظات الزيارة</label>
+        <textarea class="form-input form-textarea" id="f-notes" placeholder="اكتب ملاحظاتك عن الزيارة..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">صور الزيارة (اختياري - حتى 5 صور)</label>
+        <div class="photo-btns">
+          <button class="photo-btn" onclick="triggerCamera()">
+            <div class="photo-btn-icon">📷</div>
+            <div class="photo-btn-label">كاميرا الجوال</div>
+          </button>
+          <button class="photo-btn" onclick="triggerGallery()">
+            <div class="photo-btn-icon">🖼️</div>
+            <div class="photo-btn-label">معرض الصور</div>
+          </button>
+        </div>
+        <input type="file" id="photoCamera" accept="image/*" capture="environment" multiple onchange="handlePhotos(event)" style="display:none">
+        <input type="file" id="photoGallery" accept="image/*" multiple onchange="handlePhotos(event)" style="display:none">
+        <div class="photo-preview-grid" id="photoPreviewGrid"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('visitModal')">إلغاء</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveVisit()">💾 حفظ الزيارة</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADD EMPLOYEE MODAL ═══ -->
+<div class="modal-overlay" id="addEmpModal">
+  <div class="modal sm">
+    <div class="modal-header">
+      <div class="modal-title">👤 إضافة موظف جديد</div>
+      <button class="modal-close" onclick="closeModal('addEmpModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">الاسم الكامل</label>
+        <input type="text" class="form-input" id="ae-name" placeholder="اسم الموظف">
+      </div>
+      <div class="form-group">
+        <label class="form-label">الرقم الوظيفي</label>
+        <input type="text" class="form-input" id="ae-id" placeholder="مثال: 12345 أو 12345@mayar.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">المدينة</label>
+        <select class="form-select" id="ae-city">
+          <option value="الرياض">الرياض</option>
+          <option value="القصيم">القصيم</option>
+          <option value="حايل">حايل</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('addEmpModal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveNewEmployee()">✅ إضافة</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ EDIT EMPLOYEE MODAL ═══ -->
+<div class="modal-overlay" id="editEmpModal">
+  <div class="modal sm">
+    <div class="modal-header">
+      <div class="modal-title">✏️ تعديل بيانات الموظف</div>
+      <button class="modal-close" onclick="closeModal('editEmpModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">الاسم الكامل</label>
+        <input type="text" class="form-input" id="ee-name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">المدينة</label>
+        <select class="form-select" id="ee-city">
+          <option value="الرياض">الرياض</option>
+          <option value="القصيم">القصيم</option>
+          <option value="حايل">حايل</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('editEmpModal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveEditEmployee()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <span class="lightbox-close">✕</span>
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  🔥 FIREBASE CONFIG
+//  ← ضع إعداداتك هنا لتفعيل المزامنة بين الأجهزة
+// ═══════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyDemo_ReplaceWithYourKey",
+  authDomain: "muqrin-team.firebaseapp.com",
+  projectId: "muqrin-team",
+  storageBucket: "muqrin-team.appspot.com",
+  messagingSenderId: "000000000000",
+  appId: "1:000000000000:web:0000000000000000"
+};
+
+// ═══════════════════════════════════════════════════
+//  EMPLOYEES  (عماد → القصيم ✅)
+// ═══════════════════════════════════════════════════
+const DEFAULT_EMPLOYEES = [
+  {id:'21000696',email:'21000696@mayar.com',name:'Turki Al-Mahaya',city:'الرياض'},
+  {id:'21000848',email:'21000848@mayar.com',name:'Abdulaziz Alharbi',city:'الرياض'},
+  {id:'10140',email:'10140@mayar.com',name:'Anwar Zino Said - ANABIL',city:'الرياض'},
+  {id:'10146',email:'10146@mayar.com',name:'Mohammed Farj - ANABIL',city:'الرياض'},
+  {id:'10147',email:'10147@mayar.com',name:'MOHAMMED AL THEEB - ANABIL',city:'الرياض'},
+  {id:'10159',email:'10159@mayar.com',name:'Ahmed Talb - ANABIL',city:'الرياض'},
+  {id:'10161',email:'10161@mayar.com',name:'Najeeb Saeed Munssir - ANABIL',city:'الرياض'},
+  {id:'10197',email:'10197@mayar.com',name:'Mamoon Hassan - ANABIL',city:'القصيم'},
+  {id:'21000129',email:'21000129@mayar.com',name:'Shaoul Hamid',city:'القصيم'},
+  {id:'21000185',email:'21000185@mayar.com',name:'Omran Sadiq Al Rhman',city:'القصيم'},
+  {id:'21001132',email:'21001132@mayar.com',name:'Ahmed Turki Al Marzooq',city:'الرياض'},
+  {id:'21001218',email:'21001218@mayar.com',name:'Nayaf Nuzhah',city:'الرياض'},
+  {id:'21001198',email:'21001198@mayar.com',name:'Emad Anad',city:'القصيم'}, // ✅ نُقل للقصيم
+  {id:'10318',email:'10318@mayar.com',name:'Abdullah Al Dersy - ANABIL',city:'الرياض'},
+  {id:'10330',email:'10330@mayar.com',name:'Mazen Abdel Razzak - ANABIL',city:'الرياض'},
+  {id:'10331',email:'10331@mayar.com',name:'Osama Edress ANABIL',city:'الرياض'},
+  {id:'10336',email:'10336@mayar.com',name:'Nazrul Islam - ANABIL',city:'القصيم'},
+  {id:'10344',email:'10344@mayar.com',name:'Saleh Bahlwan - ANABIL',city:'الرياض'},
+  {id:'10345',email:'10345@mayar.com',name:'MOHAMED ISMAIL - ANABIL',city:'الرياض'},
+  {id:'10363',email:'10363@mayar.com',name:'Ali Al-Azzani - ANABIL',city:'الرياض'},
+  {id:'10365',email:'10365@mayar.com',name:'Taha Omar - ANABIL',city:'الرياض'},
+  {id:'10366',email:'10366@mayar.com',name:'Yunus Muhammad - ANABIL',city:'الرياض'},
+  {id:'10367',email:'10367@mayar.com',name:'Salem Bakr - ANABIL',city:'الرياض'},
+  {id:'10368',email:'10368@mayar.com',name:'mohammed jamel - Eye Display',city:'الرياض'},
+  {id:'103752',email:'103752@mayar.com',name:'Abdullah Jamal - Eye Display',city:'الرياض'},
+  {id:'10376',email:'10376@mayar.com',name:'Md Shohal Mil Anabil',city:'الرياض'},
+  {id:'10387',email:'10387@mayar.com',name:'Mohamed Asif - ANABIL',city:'الرياض'},
+  {id:'10391',email:'10391@mayar.com',name:'Ali talb - ANABIL',city:'الرياض'},
+  {id:'10393',email:'10393@mayar.com',name:'Yonatan Milak - ANABIL',city:'الرياض'},
+  {id:'10395',email:'10395@mayar.com',name:'Faisal Aziz - Eye Display',city:'حايل'},
+  {id:'10417',email:'10417@mayar.com',name:'Abu Nayeem - Eye Display',city:'حايل'},
+  {id:'10419',email:'10419@mayar.com',name:'Tahir muhammad - Eye Display',city:'القصيم'},
+  {id:'21001552',email:'21001552@mayar.com',name:'Ali Fawaz Mayar',city:'الرياض'},
+  {id:'10502',email:'10502@mayar.com',name:'Ali Haider Anabil',city:'حايل'},
+];
+
+const KPI_FIELDS=[
+  {key:'hours',    label:'ساعات عمل الموظف',              icon:'⏱️'},
+  {key:'space',    label:'مساحات الموظف بالسوق',           icon:'📐'},
+  {key:'rotation', label:'الروتيشن',                       icon:'🔄'},
+  {key:'offers',   label:'معرفة الموظف بالعروض الأسبوعية', icon:'🏷️'},
+  {key:'relation', label:'علاقة الموظف بمدير السوق',       icon:'🤝'},
+  {key:'touch',    label:'التتش بوينت',                    icon:'👆'},
+  {key:'last',     label:'اللمسة الأخيرة',                 icon:'✨'},
+  {key:'storage',  label:'ترتيب البضاعة بمستودع الفرع',    icon:'📦'},
+];
+
+const COLORS=[['#00e5b8','#002e25'],['#3b9eff','#00213a'],['#ffb800','#3a2d00'],['#a855f7','#2a0054'],['#ff4d6a','#3a0013'],['#00d68f','#003a25'],['#f97316','#3a1a00'],['#ec4899','#3a0028']];
+const LS_KEY='muqrin_kpi_v1';
+const LS_EMP_KEY='muqrin_emp_v1';
+
+// STATE
+let db=null,firebaseReady=false;
+let currentEmpId=null,currentFilter='all';
+let pendingPhotos=[],kpiValues={},editingEmpId=null;
+let visitsCache={};
+let EMPLOYEES=[];
+
+// ═══════════════════════════════════════════════════
+//  EMPLOYEE STORAGE
+// ═══════════════════════════════════════════════════
+function loadEmployees(){
+  try{ const s=JSON.parse(localStorage.getItem(LS_EMP_KEY)); EMPLOYEES=s&&s.length?s:[...DEFAULT_EMPLOYEES]; }
+  catch(e){ EMPLOYEES=[...DEFAULT_EMPLOYEES]; }
+}
+function saveEmployees(){ try{ localStorage.setItem(LS_EMP_KEY,JSON.stringify(EMPLOYEES)); }catch(e){} }
+
+// ═══════════════════════════════════════════════════
+//  FIREBASE
+// ═══════════════════════════════════════════════════
+function initFirebase(){
+  setSyncBanner('connecting','⏳ جارٍ الاتصال بقاعدة البيانات...');
+  try{
+    firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+    db.collection('_ping').doc('test').set({ts:Date.now()})
+      .then(()=>{
+        firebaseReady=true;
+        setSyncBanner('connected','☁️ متصل — البيانات تتزامن تلقائياً على جميع الأجهزة');
+        setTimeout(()=>setSyncBanner('hidden'),5000);
+        document.getElementById('loadingMsg').textContent='تم الاتصال! جارٍ تحميل البيانات...';
+        subscribeVisits();
+      })
+      .catch(e=>{ try{console.warn(e);}catch(_){} handleFirebaseError(); });
+  }catch(e){ handleFirebaseError(); }
+}
+
+function handleFirebaseError(){
+  firebaseReady=false;
+  setSyncBanner('error','⚠️ وضع محلي — أضف إعدادات Firebase للمزامنة');
+  setTimeout(()=>setSyncBanner('hidden'),6000);
+  loadFromLS();hideLoading();renderGrid();
+}
+
+function subscribeVisits(){
+  db.collection('visits').onSnapshot(snap=>{
+    visitsCache={};
+    snap.forEach(doc=>{ const v=doc.data(); if(!visitsCache[v.empId]) visitsCache[v.empId]=[]; visitsCache[v.empId].push({...v,_docId:doc.id}); });
+    Object.keys(visitsCache).forEach(id=>visitsCache[id].sort((a,b)=>b.ts-a.ts));
+    hideLoading(); renderGrid();
+    if(currentEmpId&&document.getElementById('view-detail').classList.contains('active')){ renderVisitsList(getVisits(currentEmpId)); refreshHero(); }
+    syncToLS();
+  },e=>{ try{console.warn(e);}catch(_){} loadFromLS();hideLoading();renderGrid(); });
+}
+
+function syncToLS(){ try{ localStorage.setItem(LS_KEY,JSON.stringify(visitsCache)); }catch(e){} }
+function loadFromLS(){ try{ const d=JSON.parse(localStorage.getItem(LS_KEY)); if(d) visitsCache=d; }catch(e){ visitsCache={}; } }
+function getVisits(empId){ return (visitsCache[empId]||[]).slice().sort((a,b)=>b.ts-a.ts); }
+
+async function persistVisit(empId,visit){
+  if(firebaseReady&&db){ try{ await db.collection('visits').add({...visit,empId}); return; }catch(e){ try{console.warn(e);}catch(_){} } }
+  if(!visitsCache[empId]) visitsCache[empId]=[];
+  visitsCache[empId].push(visit); syncToLS();
+}
+
+// ═══════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════
+function initials(name){ const p=name.trim().split(' '); return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase(); }
+function colorFor(id){ let h=0; for(let c of id) h=(h*31+c.charCodeAt(0))&0xffff; return COLORS[h%COLORS.length]; }
+function scoreClass(s){ return s>=4.5?'score-excellent':s>=3.5?'score-good':s>=2.5?'score-avg':'score-low'; }
+function visitScore(v){ const vals=KPI_FIELDS.map(f=>v.kpi[f.key]||0); return (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1); }
+function avgScore(visits){ if(!visits.length) return null; const sums=visits.map(v=>parseFloat(visitScore(v))); return (sums.reduce((a,b)=>a+b,0)/sums.length).toFixed(1); }
+function formatDate(ts){ const d=new Date(ts); const m=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']; return {day:d.getDate(),month:m[d.getMonth()],year:d.getFullYear(),full:`${d.getDate()} ${m[d.getMonth()]} ${d.getFullYear()}`}; }
+function stars(score){ let s=''; for(let i=1;i<=5;i++) s+=`<span class="star${i<=score?' lit':''}">★</span>`; return s; }
+function setSyncBanner(state,msg){ document.getElementById('syncBanner').className=state; document.getElementById('syncMsg').textContent=msg; }
+function hideLoading(){ document.getElementById('loadingOverlay').classList.add('hidden'); }
+function setFilter(f,el){ currentFilter=f; document.querySelectorAll('.ftab').forEach(t=>t.classList.remove('active')); el.classList.add('active'); renderGrid(); }
+
+// ═══════════════════════════════════════════════════
+//  STATS
+// ═══════════════════════════════════════════════════
+function updateStats(){
+  let tv=0,scores=[],last=0;
+  EMPLOYEES.forEach(e=>{ const vs=visitsCache[e.id]||[]; tv+=vs.length; vs.forEach(v=>{ scores.push(parseFloat(visitScore(v))); if(v.ts>last) last=v.ts; }); });
+  document.getElementById('s-total').textContent=EMPLOYEES.length;
+  document.getElementById('s-visits').textContent=tv;
+  document.getElementById('s-avg').textContent=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1):'–';
+  document.getElementById('s-last').textContent=last?formatDate(last).full:'–';
+}
+
+// ═══════════════════════════════════════════════════
+//  GRID
+// ═══════════════════════════════════════════════════
+function renderGrid(){
+  const q=document.getElementById('searchInput').value.trim().toLowerCase();
+  const list=EMPLOYEES.filter(e=>{ const mc=currentFilter==='all'||e.city===currentFilter; const mq=!q||e.name.toLowerCase().includes(q)||e.id.includes(q)||(e.email||'').includes(q); return mc&&mq; });
+  const grid=document.getElementById('empGrid'); grid.innerHTML='';
+  if(!list.length){ grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text2)">لا يوجد موظفون مطابقون</div>'; updateStats(); return; }
+  list.forEach(emp=>{
+    const visits=getVisits(emp.id),avg=avgScore(visits),[fg,bg]=colorFor(emp.id);
+    const pct=avg?Math.round((avg/5)*100):0;
+    const bar=pct>=80?'var(--success)':pct>=60?'var(--accent2)':pct>=40?'var(--accent3)':'var(--danger)';
+    const ck=emp.city==='الرياض'?'رياض':emp.city==='القصيم'?'قصيم':'حايل';
+    const card=document.createElement('div'); card.className='emp-card';
+    card.innerHTML=`
+      <div class="emp-card-actions">
+        <button class="card-action-btn" onclick="event.stopPropagation();openEditEmp('${emp.id}')" title="تعديل">✏️</button>
+        <button class="card-action-btn del" onclick="event.stopPropagation();deleteEmployee('${emp.id}')" title="حذف">🗑️</button>
+      </div>
+      <span class="emp-city-badge city-${ck}">${emp.city}</span>
+      <div class="emp-card-header">
+        <div class="emp-avatar" style="background:${bg};color:${fg}">${initials(emp.name)}</div>
+        <div style="min-width:0"><div class="emp-name">${emp.name}</div><div class="emp-id">${emp.email||emp.id}</div></div>
+      </div>
+      <div class="emp-stats">
+        <div class="emp-stat-pill">🗂️ <span class="num">${visits.length}</span> زيارة</div>
+        ${avg?`<div class="emp-stat-pill">⭐ <span class="num">${avg}</span>/5</div>`:'<div class="emp-stat-pill">لا توجد زيارات</div>'}
+      </div>
+      ${avg?`<div class="emp-kpi-bar"><div class="kpi-bar-label"><span>متوسط KPI</span><span>${pct}%</span></div><div class="kpi-bar-track"><div class="kpi-bar-fill" style="width:${pct}%;background:${bar}"></div></div></div>`:''}
+    `;
+    card.onclick=()=>openEmployee(emp.id); grid.appendChild(card);
+  });
+  updateStats();
+}
+
+// ═══════════════════════════════════════════════════
+//  ADD / EDIT / DELETE EMPLOYEE
+// ═══════════════════════════════════════════════════
+function openAddEmpModal(){ document.getElementById('ae-name').value=''; document.getElementById('ae-id').value=''; document.getElementById('ae-city').value='الرياض'; document.getElementById('addEmpModal').classList.add('open'); }
+function saveNewEmployee(){
+  const name=document.getElementById('ae-name').value.trim(), rawId=document.getElementById('ae-id').value.trim(), city=document.getElementById('ae-city').value;
+  if(!name){ showToast('⚠️ يرجى إدخال اسم الموظف'); return; }
+  if(!rawId){ showToast('⚠️ يرجى إدخال الرقم الوظيفي'); return; }
+  const cleanId=rawId.includes('@')?rawId.split('@')[0]:rawId;
+  if(EMPLOYEES.find(e=>e.id===cleanId)){ showToast('⚠️ هذا الرقم الوظيفي موجود مسبقاً'); return; }
+  EMPLOYEES.push({id:cleanId,email:rawId.includes('@')?rawId:rawId+'@mayar.com',name,city});
+  saveEmployees(); closeModal('addEmpModal'); renderGrid(); showToast('✅ تم إضافة الموظف');
+}
+function openEditEmp(id){ const e=EMPLOYEES.find(x=>x.id===id); if(!e) return; editingEmpId=id; document.getElementById('ee-name').value=e.name; document.getElementById('ee-city').value=e.city; document.getElementById('editEmpModal').classList.add('open'); }
+function saveEditEmployee(){
+  const name=document.getElementById('ee-name').value.trim(), city=document.getElementById('ee-city').value;
+  if(!name){ showToast('⚠️ يرجى إدخال الاسم'); return; }
+  const e=EMPLOYEES.find(x=>x.id===editingEmpId); if(!e) return;
+  e.name=name; e.city=city; saveEmployees(); closeModal('editEmpModal'); renderGrid();
+  if(currentEmpId===editingEmpId&&document.getElementById('view-detail').classList.contains('active')) refreshHero();
+  showToast('✅ تم تعديل بيانات الموظف');
+}
+function deleteEmployee(id){
+  const e=EMPLOYEES.find(x=>x.id===id); if(!e) return;
+  if(!confirm(`هل أنت متأكد من حذف "${e.name}"؟\nسيتم حذف جميع زياراته أيضاً.`)) return;
+  EMPLOYEES=EMPLOYEES.filter(x=>x.id!==id); delete visitsCache[id];
+  saveEmployees(); syncToLS(); renderGrid(); showToast('🗑️ تم حذف الموظف');
+}
+
+// ═══════════════════════════════════════════════════
+//  DETAIL
+// ═══════════════════════════════════════════════════
+function openEmployee(id){ currentEmpId=id; refreshHero(); renderVisitsList(getVisits(id)); showView('detail'); }
+function refreshHero(){
+  const emp=EMPLOYEES.find(e=>e.id===currentEmpId); if(!emp) return;
+  const visits=getVisits(currentEmpId),avg=avgScore(visits),[fg,bg]=colorFor(emp.id);
+  const pct=avg?Math.round((avg/5)*100):0,r=36,circ=2*Math.PI*r,dash=pct?(pct/100)*circ:0;
+  const color=pct>=80?'#00d68f':pct>=60?'#3b9eff':pct>=40?'#ffb800':'#ff4d6a';
+  document.getElementById('empHero').innerHTML=`
+    <div class="emp-hero">
+      <div class="hero-avatar" style="background:${bg};color:${fg}">${initials(emp.name)}</div>
+      <div class="hero-info">
+        <h2>${emp.name}</h2>
+        <div class="hero-meta">
+          <div class="hero-tag">📍 ${emp.city}</div>
+          <div class="hero-tag">🆔 ${emp.email||emp.id}</div>
+          <div class="hero-tag">🗂️ ${visits.length} زيارة</div>
+        </div>
+        <div class="hero-actions">
+          <button class="btn btn-secondary" style="padding:7px 14px;font-size:12px;" onclick="openEditEmp('${emp.id}')">✏️ تعديل</button>
+          <button class="btn btn-secondary" style="padding:7px 14px;font-size:12px;" onclick="exportEmpExcel('${emp.id}')">📥 Excel</button>
+        </div>
+      </div>
+      <div class="hero-kpi-summary" style="margin-right:auto;">
+        <div class="score-ring">
+          <svg width="90" height="90" viewBox="0 0 90 90">
+            <circle cx="45" cy="45" r="${r}" fill="none" stroke="var(--surface3)" stroke-width="7"/>
+            <circle cx="45" cy="45" r="${r}" fill="none" stroke="${color}" stroke-width="7"
+              stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round"/>
+          </svg>
+          <div class="score-ring-val"><span>${avg||'–'}</span><span class="score-ring-lbl">/ 5</span></div>
+        </div>
+        <div class="big-score-label">متوسط KPI الكلي</div>
+      </div>
+    </div>`;
+}
+function renderVisitsList(visits){
+  const c=document.getElementById('visitsList');
+  if(!visits.length){ c.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">لا توجد زيارات مسجّلة</div><div>اضغط على "زيارة جديدة" لتسجيل أول زيارة</div></div>`; return; }
+  c.innerHTML='';
+  visits.forEach(v=>{
+    const sc=parseFloat(visitScore(v)),dt=formatDate(v.ts),card=document.createElement('div');
+    card.className='visit-card';
+    card.innerHTML=`
+      <div class="visit-header" onclick="this.closest('.visit-card').classList.toggle('open')">
+        <div class="visit-date-badge"><div class="visit-date-day">${dt.day}</div><div class="visit-date-month">${dt.month} ${dt.year}</div></div>
+        <div class="visit-info">
+          <div class="visit-store">🏪 ${v.store||'غير محدد'}</div>
+          <div style="color:var(--text2);font-size:11px;">⏰ ${new Date(v.ts).toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        <div class="visit-score-badge ${scoreClass(sc)}">⭐ ${sc}</div>
+        <div class="visit-expand">▼</div>
+      </div>
+      <div class="visit-body">
+        <div class="kpi-grid">${KPI_FIELDS.map(f=>`<div class="kpi-item"><div class="kpi-item-label">${f.icon} ${f.label}</div><div class="kpi-stars">${stars(v.kpi[f.key]||0)}</div></div>`).join('')}</div>
+        ${v.notes?`<div class="visit-notes-box"><div class="visit-notes-title">الملاحظات</div><div class="visit-notes-text">${v.notes}</div></div>`:''}
+        ${v.photos&&v.photos.length?`<div><div class="visit-notes-title" style="margin-bottom:8px;">صور الزيارة</div><div class="visit-photos">${v.photos.map(p=>`<img src="${p}" class="visit-photo" onclick="event.stopPropagation();openLightbox('${p}')" alt="">`).join('')}</div></div>`:''}
+      </div>`;
+    c.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  VISIT MODAL
+// ═══════════════════════════════════════════════════
+function openNewVisitModal(){
+  kpiValues={};pendingPhotos=[];
+  ['f-store','f-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('photoPreviewGrid').innerHTML='';
+  document.getElementById('photoCamera').value='';
+  document.getElementById('photoGallery').value='';
+  const sb=document.getElementById('saveBtn'); sb.disabled=false; sb.innerHTML='💾 حفظ الزيارة';
+  const half=Math.ceil(KPI_FIELDS.length/2);
+  ['kpiFormItems','kpiFormItems2'].forEach((elId,col)=>{
+    document.getElementById(elId).innerHTML=(col===0?KPI_FIELDS.slice(0,half):KPI_FIELDS.slice(half)).map(f=>`
+      <div class="form-group">
+        <label class="form-label">${f.icon} ${f.label}</label>
+        <div class="star-rating-wrap">
+          ${[1,2,3,4,5].map(i=>`<span class="star-input" onclick="setKpi('${f.key}',${i},this.closest('.star-rating-wrap'))">★</span>`).join('')}
+          <span class="star-score-display" id="sd-${f.key}">–</span>
+        </div>
+      </div>`).join('');
+  });
+  document.getElementById('visitModal').classList.add('open');
+}
+function setKpi(key,val,wrap){ kpiValues[key]=val; wrap.querySelectorAll('.star-input').forEach((s,i)=>s.classList.toggle('selected',i<val)); document.getElementById('sd-'+key).textContent=['','ضعيف','مقبول','جيد','جيد جداً','ممتاز'][val]; }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function triggerCamera(){ if(pendingPhotos.length>=5){ showToast('⚠️ الحد الأقصى 5 صور'); return; } document.getElementById('photoCamera').click(); }
+function triggerGallery(){ if(pendingPhotos.length>=5){ showToast('⚠️ الحد الأقصى 5 صور'); return; } document.getElementById('photoGallery').click(); }
+function handlePhotos(e){
+  const files=Array.from(e.target.files).slice(0,5-pendingPhotos.length);
+  const prev=document.getElementById('photoPreviewGrid');
+  files.forEach(f=>{
+    if(f.size>5*1024*1024){ showToast('⚠️ الصورة أكبر من 5MB'); return; }
+    const r=new FileReader(); r.onload=ev=>{
+      pendingPhotos.push(ev.target.result);
+      const idx=pendingPhotos.length-1,wrap=document.createElement('div'); wrap.className='photo-remove-wrap';
+      const img=document.createElement('img'); img.src=ev.target.result; img.className='photo-preview-thumb';
+      const rem=document.createElement('button'); rem.className='photo-remove'; rem.textContent='✕';
+      rem.onclick=()=>{ pendingPhotos.splice(idx,1); wrap.remove(); };
+      wrap.appendChild(img); wrap.appendChild(rem); prev.appendChild(wrap);
+    }; r.readAsDataURL(f);
+  }); e.target.value='';
+}
+async function saveVisit(){
+  const store=document.getElementById('f-store').value.trim();
+  if(!store){ showToast('⚠️ يرجى إدخال اسم السوق'); return; }
+  const filled=KPI_FIELDS.filter(f=>kpiValues[f.key]);
+  if(filled.length<KPI_FIELDS.length&&!confirm(`لم تقيّم جميع مؤشرات KPI (${filled.length}/${KPI_FIELDS.length}). متابعة؟`)) return;
+  const kpi={}; KPI_FIELDS.forEach(f=>kpi[f.key]=kpiValues[f.key]||0);
+  const visit={id:Date.now().toString(),ts:Date.now(),store,kpi,notes:document.getElementById('f-notes').value.trim(),photos:[...pendingPhotos]};
+  const sb=document.getElementById('saveBtn'); sb.disabled=true; sb.innerHTML='<span class="spinner"></span> جارٍ الحفظ...';
+  await persistVisit(currentEmpId,visit);
+  if(!firebaseReady){ if(!visitsCache[currentEmpId]) visitsCache[currentEmpId]=[]; visitsCache[currentEmpId].push(visit); syncToLS(); renderGrid(); refreshHero(); renderVisitsList(getVisits(currentEmpId)); }
+  closeModal('visitModal');
+  showToast('✅ تم حفظ الزيارة'+(firebaseReady?' — متزامنة على جميع الأجهزة':''));
+}
+
+// ═══════════════════════════════════════════════════
+//  📥 EXCEL EXPORT
+// ═══════════════════════════════════════════════════
+function exportExcel(){
+  const wb=XLSX.utils.book_new();
+  // Sheet 1: Summary
+  const sumRows=[['Muqrin Team - ملخص KPI الميداني'],['تاريخ التصدير: '+new Date().toLocaleDateString('ar-SA')],[]];
+  sumRows.push(['اسم الموظف','الرقم الوظيفي','المدينة','عدد الزيارات','متوسط KPI','آخر زيارة']);
+  EMPLOYEES.forEach(e=>{
+    const vs=getVisits(e.id),avg=avgScore(vs),last=vs.length?formatDate(vs[0].ts).full:'–';
+    sumRows.push([e.name,e.email||e.id,e.city,vs.length,avg||'–',last]);
+  });
+  const ws1=XLSX.utils.aoa_to_sheet(sumRows); XLSX.utils.book_append_sheet(wb,ws1,'ملخص الموظفين');
+  // Sheet 2: All Visits
+  const visitRows=[['اسم الموظف','الرقم الوظيفي','المدينة','اسم السوق','تاريخ الزيارة','وقت الزيارة','متوسط KPI',
+    ...KPI_FIELDS.map(f=>f.label),'الملاحظات']];
+  EMPLOYEES.forEach(e=>{
+    getVisits(e.id).forEach(v=>{
+      const dt=formatDate(v.ts);
+      visitRows.push([e.name,e.email||e.id,e.city,v.store||'',dt.full,
+        new Date(v.ts).toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'}),
+        visitScore(v),...KPI_FIELDS.map(f=>v.kpi[f.key]||0),v.notes||'']);
+    });
+  });
+  const ws2=XLSX.utils.aoa_to_sheet(visitRows); XLSX.utils.book_append_sheet(wb,ws2,'جميع الزيارات');
+  XLSX.writeFile(wb,`Muqrin_Team_KPI_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('📥 تم تحميل ملف Excel');
+}
+
+function exportEmpExcel(empId){
+  const emp=EMPLOYEES.find(e=>e.id===empId); if(!emp) return;
+  const wb=XLSX.utils.book_new();
+  const rows=[['Muqrin Team — تقرير الموظف'],['الاسم: '+emp.name],['المدينة: '+emp.city],['الرقم: '+(emp.email||emp.id)],[]];
+  rows.push(['اسم السوق','تاريخ الزيارة','وقت الزيارة','متوسط KPI',...KPI_FIELDS.map(f=>f.label),'الملاحظات']);
+  getVisits(empId).forEach(v=>{
+    const dt=formatDate(v.ts);
+    rows.push([v.store||'',dt.full,new Date(v.ts).toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'}),visitScore(v),...KPI_FIELDS.map(f=>v.kpi[f.key]||0),v.notes||'']);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows); XLSX.utils.book_append_sheet(wb,ws,'الزيارات');
+  XLSX.writeFile(wb,`${emp.name.replace(/\s+/g,'_')}_KPI.xlsx`);
+  showToast('📥 تم تحميل تقرير '+emp.name);
+}
+
+// ═══════════════════════════════════════════════════
+//  UI
+// ═══════════════════════════════════════════════════
+function openLightbox(src){ document.getElementById('lightboxImg').src=src; document.getElementById('lightbox').classList.add('open'); }
+function closeLightbox(){ document.getElementById('lightbox').classList.remove('open'); }
+let _tt; function showToast(msg){ clearTimeout(_tt); const t=document.getElementById('toast'); document.getElementById('toastMsg').textContent=msg; t.classList.add('show'); _tt=setTimeout(()=>t.classList.remove('show'),3500); }
+function showView(id){ document.querySelectorAll('.view').forEach(v=>v.classList.remove('active')); document.getElementById('view-'+id).classList.add('active'); window.scrollTo(0,0); }
+function goHome(){ showView('home'); renderGrid(); }
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+function init(){
+  document.getElementById('headerDate').textContent=new Date().toLocaleDateString('ar-SA',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
+  loadEmployees();
+  if(firebaseConfig.apiKey==='AIzaSyDemo_ReplaceWithYourKey'){
+    setSyncBanner('error','⚠️ يعمل محلياً — أضف إعدادات Firebase للمزامنة بين الأجهزة');
+    setTimeout(()=>setSyncBanner('hidden'),7000);
+    loadFromLS(); hideLoading(); renderGrid();
+  } else { initFirebase(); }
+}
+init();
+</script>
+</body>
+</html>
